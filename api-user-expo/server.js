@@ -18,7 +18,7 @@ const prefix = '/api';
 
 
 mongoose.Promise = global.Promise;
-const uri = 'mongodb+srv://zaouiyassine567:TxSJwbVuAYZix1CK@users.sgjydjd.mongodb.net/?appName=Users';
+const uri = '';
 class TokenBucket {
 
   constructor(capacity, fillPerSecond) {
