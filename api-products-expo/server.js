@@ -18,7 +18,7 @@ mongoose.Promise = global.Promise;
 
 
 // remplacer toute cette chaine par l'URI de connexion à votre propre base dans le cloud s
-const uri = 'mongodb+srv://zaouiyassine567:bNDHu5DNV30GrLFw@product.srmea1o.mongodb.net/?appName=Product';
+const uri = '';
 app.set('view engine', 'ejs');
 
 const options = {
