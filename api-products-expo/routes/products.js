@@ -76,8 +76,8 @@ async function getProduct(req, res) {
   }
   async function addProduct(req, res) {
     try {
-        const { title, desc, price, categorie, imgs, stock } = req.body;
-
+        const { title, desc, price, categorie, imgs } = req.body.productData;
+       
         // Basic validation
         if (!title || !price || !categorie) {
             return res.status(400).json({ message: "Title, Price, and Category are required." });
@@ -89,7 +89,7 @@ async function getProduct(req, res) {
             price, // MongoDB will handle Decimal128 conversion if defined in schema
             categorie,
             imgs,
-            stock: stock || 0
+           
         });
 
         const savedProduct = await newProduct.save();
@@ -102,13 +102,13 @@ async function getProduct(req, res) {
 
 // 2. UPDATE PRODUCT (PUT)
 async function updateProduct(req, res) {
-    const productId = req.params.id; // Ensure your route uses :id
-    
+    const productId = req.params._id; // Ensure your route uses :id
+   
     try {
         // { new: true } returns the updated document instead of the old one
         const updatedProduct = await Product.findByIdAndUpdate(
             productId,
-            req.body,
+            req.body.productData,
             { new: true, runValidators: true }
         );
 
@@ -125,8 +125,8 @@ async function updateProduct(req, res) {
 
 // 3. DELETE PRODUCT (DELETE)
 async function deleteProduct(req, res) {
-    const productId = req.params.id;
-
+    const productId = req.params._id;
+console.log(productId)
     try {
         const deletedProduct = await Product.findByIdAndDelete(productId);
 

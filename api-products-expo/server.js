@@ -7,7 +7,10 @@ app.use(cors({
   origin: '*',
   credentials: true
 }));
+app.use(express.json({ limit: '50mb' }));
 
+// Increase the limit for URL-encoded bodies
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 let mongoose = require('mongoose');
 mongoose.Promise = global.Promise;
@@ -58,10 +61,22 @@ app.route(prefix + '/products')
   
   app.route(prefix + '/products_detail/:_id')
   .get(lr.limitRequests(5, 10), product.getProduct);
-  
+  app.post(
+    `${prefix}/updateProduct/:_id`,
+    lr.limitRequests(5, 10),   
+    product.updateProduct
+    );
+    app.delete(
+      `${prefix}/delete/:_id`,
+      lr.limitRequests(5, 10),   
+      product.deleteProduct
+      );
 
-
-
+  app.post(
+    `${prefix}/addProduct`,
+    lr.limitRequests(5, 10),   
+    product.addProduct
+    );
 // On démarre le serveur
 app.listen(port, "0.0.0.0");
 console.log('Serveur démarré sur http://localhost:' + port);

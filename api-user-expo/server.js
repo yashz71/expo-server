@@ -111,24 +111,41 @@ app.route(prefix + '/signup',limitRequests(5, 10))
 app.route(prefix + '/verify',limitRequests(5, 10))
   .get(user.verifyToken); 
   app.get(
-    `${prefix}/getuser/`,
+    `${prefix}/getusers/`,
     limitRequests(5, 10),   
-    user.authMiddleware,         
+    user.getAllUsers         
+  );
+  app.post(
+    `${prefix}/getuser`,
+    limitRequests(5, 10),   
     user.getUser           
   );
    app.post( 
     `${prefix}/wishlist/:productId`,
     limitRequests(5, 10),   
-    user.authMiddleware,         
     user.addToWishlist           
   );
-  app.get(
+  app.put( 
+    `${prefix}/update/:_id`,
+    limitRequests(5, 10),   
+    user.adminUpdateUser        
+  );
+  app.post( 
+    `${prefix}/addUser/`,
+    limitRequests(5, 10),   
+    user.adminAddUser        
+  );
+  app.post(
     `${prefix}/getWishlist/`,
     limitRequests(5, 10),   
-    user.authMiddleware,         
     user.getWishlist           
   );
-  app.delete('/api/wishlist/:productId', user.authMiddleware, user.removeFromWishlist);
+  app.delete(
+    `${prefix}/delete/:_id`,
+    limitRequests(5, 10),   
+    user.deleteUser
+    );
+  app.post('/api/wishlist/:productId', user.removeFromWishlist);
 
 // On démarre le serveur
 app.listen(port, "0.0.0.0");

@@ -5,7 +5,7 @@ const {secret} = require("../config/auth.config");
 const { Validator } = require('node-input-validator');
 require("cookie-parser");
 let axios = require("axios"); // call Products microservice
-
+const { auth } = require('../firebase-admin');
 
 
 function authMiddleware(req, res, next) {
@@ -28,17 +28,21 @@ function authMiddleware(req, res, next) {
 async function getUser(req, res){
 
 try {
+  const { userMail } = req.body; 
+console.log("mail: ", userMail)
   const user = await Users.findOne({ userMail: userMail });
 
   if (!user) {
+    console.log("user not found in getUSer")
     return res.status(404).json({ message: "User not found" });
   }
 
   const response = {
     userName: user.userName,
-    userMail: user.userMail
+    userMail: user.userMail,
+    role: user.role
   };
-
+console.log("res: ",response);
   res.json(response);
 } catch (err) {
   res.status(500).json({ msg: "Server error" });
@@ -67,6 +71,8 @@ async function verifyToken(req, res) {
 
 async function getWishlist(req, res) {
   try {
+   
+
     // Extract userMail from request (body, query, or params)
     const { userMail } = req.body; 
 
@@ -100,6 +106,8 @@ async function getWishlist(req, res) {
 async function addToWishlist(req, res) {
   try {
     const { productId } = req.params;
+    console.log("body: ", req.body);
+
     // Assuming userMail is passed in the request body or extracted from a token
     const { userMail } = req.body; 
 
@@ -182,6 +190,7 @@ async function signup(req, res) {
     const newUser = new Users({ 
       userName: req.body.userName,
       userMail: req.body.userMail,
+      role: req.body.role,
       userPassword: bcrypt.hashSync(req.body.userPassword, 14)
     });
 
@@ -193,58 +202,7 @@ async function signup(req, res) {
     return res.status(500).send({ message: "Internal server error" });
   }
 }
-async function signin(req, res) {
-  try {
-    // Input validation
-    const v = new Validator(req.body, {
-      userName: 'required|maxLength:10',
-      userPassword: 'required'
-    });
 
-    const matched = await v.check();
-    
-    if (!matched) {
-      return res.status(422).send({ message: "Invalid credentials" });
-    }
-
-    // Find user
-    const user = await Users.findOne({ userName: req.body.userName }).exec();
-    
-    if (!user) {
-      return res.status(404).send({ message: "User Not found." });
-    }
-
-    // Verify password
-    const passwordIsValid = bcrypt.compareSync(
-      req.body.userPassword,
-      user.userPassword
-    );
-
-    if (!passwordIsValid) {
-      return res.status(401).send({
-        accessToken: null,
-        message: "Invalid Password!"
-      });
-    }
-
-    // Generate token
-    const token = jwt.sign({ id: user._id }, secret, {
-      expiresIn: 86400 
-    });
-    
-    res.status(200).send({
-      id: user._id,
-      username: user.userName,
-      usermail: user.userMail,
-      token,
-      message: "Connected successfully"
-    });
-
-  } catch (err) {
-    console.error("Signin error:", err);
-    res.status(500).send({ message: "Internal server error" });
-  }
-}
 async function getAllUsers(req, res) {
   try {
     // Return all users but exclude passwords for security
@@ -258,7 +216,7 @@ async function getAllUsers(req, res) {
 // 2. Update a user (e.g., change role or username)
 async function updateUser(req, res) {
   try {
-    const { id } = req.params;
+    const  id  = req.params._id;
     const updates = req.body;
 
     // If password is being updated, it must be hashed
@@ -278,7 +236,8 @@ async function updateUser(req, res) {
 // 3. Delete a user
 async function deleteUser(req, res) {
   try {
-    const { id } = req.params;
+    console.log("params del: ",req.params);
+    const  id  = req.params._id;
     const deletedUser = await Users.findByIdAndDelete(id);
     
     if (!deletedUser) return res.status(404).json({ message: "User not found" });
@@ -325,7 +284,80 @@ function isAdmin(req, res, next) {
     res.status(403).json({ message: "Require Admin Role!" });
   }
 }
+async function adminUpdateUser(req, res){
+const  id  = req.params._id; // The MongoDB Object ID
+console.log("req.body: ",req.body);
+const { userName, userMail, role } = req.body;
 
+try {
+  // 1. Find the user in MongoDB to get their firebaseUid
+  const user = await Users.findById(id);
+  if (!user) {
+    return res.status(404).json({ message: "User not found in database" });
+  }
+  const firebaseUser = await auth.getUserByEmail(user.userMail);
+  const uid = firebaseUser.uid;
+  // 2. Prepare Firebase Update Object
+  // Only add fields if they are provided in the request
+  const firebaseUpdate = {};
+  if (userMail) firebaseUpdate.email = userMail;
+  if (userName) firebaseUpdate.displayName = userName;
+
+  // 3. Update Firebase Auth (using the stored UID)
+  if (Object.keys(firebaseUpdate).length > 0) {
+    await auth.updateUser(uid, firebaseUpdate);
+  }
+
+  // 4. Update MongoDB Profile
+  user.userName = userName || user.userName;
+  user.userMail = userMail || user.userMail;
+  user.role = role || user.role;
+  
+  await user.save();
+
+  res.status(200).json({ 
+    message: "User updated successfully in Firebase and MongoDB",
+    user 
+  });
+} catch (error) {
+  console.error("Error updating user:", error);
+  res.status(500).json({ message: error.message });
+}
+}
+  
+async function adminAddUser(req, res) {
+  console.log("rq.body: ",req.body);
+
+  const { userMail, userPassword, userName, role } = req.body;
+
+  try {
+    // 1. Create the user in Firebase Auth
+    const userRecord = await auth.createUser({
+      email: userMail,
+      password: userPassword,
+      displayName: userName,
+    });
+
+    // 2. Save the user to MongoDB
+    // We store the 'uid' from Firebase so we can link them later
+    const newUser = new Users({
+      userName: userName,
+      userMail: userMail,
+      userPassword: bcrypt.hashSync(userPassword, 14),
+      role: role || 'user'
+    });
+
+    await newUser.save();
+
+    res.status(201).json({ 
+      message: "User created successfully", 
+      uid: userRecord.uid 
+    });
+  } catch (error) {
+    console.error("Error creating user:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
 module.exports = {
   signin,
   signup,
@@ -338,5 +370,7 @@ module.exports = {
   removeFromWishlist,
   getAllUsers, // New
   updateUser,  // New
-  deleteUser   // New
+  deleteUser,
+  adminUpdateUser,
+  adminAddUser   // New
 };
